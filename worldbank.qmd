@@ -1,0 +1,107 @@
+---
+title: "Lab 05"
+author: Nigel
+format:
+  html:
+    toc: true
+---
+
+
+# Task 1: Establishing a Productive Software Environment for the Project
+```{r}
+#| label: setup
+#| include: false
+
+library(dplyr)
+library(tidyr)
+library(readr)
+con_worldbank <- DBI::dbConnect(odbc::odbc(), dsn = "worldbank")
+```
+
+```{r}
+# Load the CSV file
+file_path <- 'C:/Users/itsss/Desktop/lab05/lab05/data/API_SP.POP.TOTL_DS2_en_csv_v2_45183.csv'
+population_data <- read_csv(file_path, skip = 4)
+
+# Inspect the first few rows to understand its structure
+head(population_data)
+```
+
+```{r}
+# Load the CSV file for metadata
+metadata_file_path <- 'C:/Users/itsss/Desktop/lab05/lab05/data/Metadata_Country_API_SP.POP.TOTL_DS2_en_csv_v2_45183.csv'
+metadata <- read_csv(metadata_file_path)
+
+# Display the first few rows to understand its structure
+head(metadata)
+```
+
+```{r}
+# Clean column names
+colnames(population_data) <- make.names(colnames(population_data), unique = TRUE)
+
+# Remove Indicator.Name and Indicator.Code columns
+population_data <- population_data %>%
+  select(-Indicator.Name, -Indicator.Code, -...69)
+
+# Reshape data to long format
+population_long <- population_data %>%
+  pivot_longer(cols = starts_with("X"),
+               names_to = "Year",
+               names_prefix = "X",
+               values_to = "Population") %>%
+  mutate(Year = as.integer(Year),
+         Population = as.numeric(Population))
+
+# Inspect the cleaned data
+head(population_long)
+```
+
+
+```{r}
+# Save the cleaned data to a new CSV file
+cleaned_file_path <- 'C:/Users/itsss/Desktop/lab05/lab05/new_data/cleaned_population_data.csv'
+write_csv(population_long, cleaned_file_path)
+```
+
+
+
+```{r}
+# Load the CSV file
+file_path <- 'C:/Users/itsss/Desktop/lab05/lab05/data/API_EN.ATM.METH.KT.CE_DS2_en_csv_v2_45625.csv'
+methane_data <- read_csv(file_path, skip = 4)
+
+# Inspect the first few rows to understand its structure
+head(methane_data)
+```
+
+```{r}
+# Clean column names
+colnames(methane_data) <- make.names(colnames(methane_data), unique = TRUE)
+
+# Remove Indicator.Name and Indicator.Code columns
+methane_data <- methane_data %>%
+  select(-Indicator.Name, -Indicator.Code)
+
+# Remove empty columns
+methane_data <- methane_data %>%
+  select(where(~ any(!is.na(.))))
+
+# Reshape data to long format
+methane_long <- methane_data %>%
+  pivot_longer(cols = starts_with("X"),
+               names_to = "Year",
+               names_prefix = "X",
+               values_to = "Emissions") %>%
+  mutate(Year = as.integer(Year),
+         Emissions = as.numeric(Emissions))
+
+# Inspect the cleaned data
+head(methane_long)
+
+# Save the cleaned data to a new CSV file
+write_csv(methane_long, "C:/Users/itsss/Desktop/lab05/lab05/new_data/cleaned_methane_data.csv")
+```
+
+
+
