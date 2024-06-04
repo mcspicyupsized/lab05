@@ -1,0 +1,387 @@
+---
+title: "Lab 05"
+author: Nigel
+output:
+  html_document:
+    embed-resources: true
+---
+
+# Establishing a Productive Software Environment
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+library(DBI)
+library(dplyr)
+library(tidyr)
+library(readr)
+con_world_bank_db <- DBI::dbConnect(odbc::odbc(), dsn = "world_bank_db")
+```
+
+# Analyzing Country-Level Statistics on Methane emissions (kt of CO2 equivalent)
+
+## Dataset Number Calculation
+
+```{r}
+# Given admin ID
+admin_id <- 2302689
+
+# Calculate data set number
+dataset_number <- admin_id %% 35 + 1
+dataset_number
+```
+
+Q: Write a paragraph, not exceeding 150 words, that introduces the datasets you will be working with. For example, what indicator will you be analyzing? How do the World Bank’s metadata define the indicator? Why is it important to study this indicator? Use GenAI wisely.
+
+A: The dataset that I will be working with focuses on methane emissions, which is an important indicator defined by the World Bank. In the datasets provided, I will be focusing on the Indicator "Methane emissions (kt of CO2 equivalent)" and code "EN.ATM.METH.KT.CE ".
+
+## Cleaning the Data
+
+Both World Bank CSV data files include the population data: (API_SP.POP.TOTL_DS2_en_csv_v2_45183.csv) and the Methane Emissions (kt of CO2 equivalent): (API_EN.ATM.METH.KT.CE_DS2_en_csv_v2_45625.csv) require cleanup before importing into a database. Specifically:
+
+-   Before the tabular data starts, the files include several lines of metadata, which require removal.
+-   Trailing commas at the end of lines violate the CSV standard and need to be removed.
+-   Some column names contain spaces or start with numbers, which will be problematic for performing SQL queries.
+-   The World Bank enclosed all CSV cells in double-quotation marks. However, PostgreSQL requires numeric data to be unquoted.
+
+```{r}
+#| eval: false
+clean_up_wb_csv <- function(
+    in_file,
+    out_file = "world_bank_data.csv") {
+  # Use readr::read_lines() to read the file line by line
+  lines <- readr::read_lines(in_file)
+
+  # Drop all lines before the first line that starts with
+  # "Country Name"
+  lines <- lines[stringr::str_which(lines, "^\"Country Name\""):length(lines)]
+
+  # Remove any comma at the end of a line
+  lines <- stringr::str_remove(lines, ",$")
+
+  # Edit the first line performing all of the following steps:
+  # *   Convert all uppercase letters to lower case.
+  # *   Replace any whitespace with underscores.
+  # *   Put `year_` in front of any string in double-quotation marks that
+  #     starts with a digit.
+  # *   Remove all double-quotation marks.
+  lines[1] <- lines[1] |>
+    stringr::str_to_lower() |>
+    stringr::str_replace_all(" ", "_") |>
+    stringr::str_replace_all("\"(\\d+)", "year_\\1") |>
+    stringr::str_remove_all("\"")
+
+  # Define a function to remove double quotation marks around empty strings
+  # and integers
+  remove_quotes <- function(line) {
+    stringr::str_replace_all(line, "\"(\\\"*|-?\\d+)\"", "\\1")
+  }
+
+  # Apply the function to each line using purrr's map_chr() function
+  lines <- c(
+    lines[1],
+    purrr::map_chr(lines[-1], remove_quotes)
+  )
+
+  # Rename country_name to country_name_wb to distinguish it from the
+  # country_name_en column in the country_codes table. The names in the
+  # tables don't match. Instead country_code should be used for joining
+  # the tables.
+  lines[1] <- stringr::str_replace(
+    lines[1],
+    "country_name",
+    "country_name_wb"
+  )
+
+  # Write the cleaned-up lines to a new file
+  readr::write_lines(lines, out_file)
+}
+
+clean_up_wb_csv("C:/Users/itsss/Desktop/lab05/lab05/data/API_SP.POP.TOTL_DS2_en_csv_v2_45183.csv", "population.csv")
+clean_up_wb_csv("C:/Users/itsss/Desktop/lab05/lab05/data/API_EN.ATM.METH.KT.CE_DS2_en_csv_v2_45625.csv", "indicators.csv")
+```
+
+## Importing the Data to world_bank_db
+
+In this section I will write SQL code to import the data from the cleaned-up CSVs into the world_bank_db database. This process will involve creating appropriate tables in the database and using SQL COPY commands to load the cleaned data into these tables.
+
+```{sql, connection=con_world_bank_db}
+#| eval: false
+CREATE TABLE population (
+    country_name_wb VARCHAR(255),
+    country_code VARCHAR(3) PRIMARY KEY,
+    indicator_name VARCHAR(255),
+    indicator_code VARCHAR(50),
+    year_1960 BIGINT,
+    year_1961 BIGINT,
+    year_1962 BIGINT,
+    year_1963 BIGINT,
+    year_1964 BIGINT,
+    year_1965 BIGINT,
+    year_1966 BIGINT,
+    year_1967 BIGINT,
+    year_1968 BIGINT,
+    year_1969 BIGINT,
+    year_1970 BIGINT,
+    year_1971 BIGINT,
+    year_1972 BIGINT,
+    year_1973 BIGINT,
+    year_1974 BIGINT,
+    year_1975 BIGINT,
+    year_1976 BIGINT,
+    year_1977 BIGINT,
+    year_1978 BIGINT,
+    year_1979 BIGINT,
+    year_1980 BIGINT,
+    year_1981 BIGINT,
+    year_1982 BIGINT,
+    year_1983 BIGINT,
+    year_1984 BIGINT,
+    year_1985 BIGINT,
+    year_1986 BIGINT,
+    year_1987 BIGINT,
+    year_1988 BIGINT,
+    year_1989 BIGINT,
+    year_1990 BIGINT,
+    year_1991 BIGINT,
+    year_1992 BIGINT,
+    year_1993 BIGINT,
+    year_1994 BIGINT,
+    year_1995 BIGINT,
+    year_1996 BIGINT,
+    year_1997 BIGINT,
+    year_1998 BIGINT,
+    year_1999 BIGINT,
+    year_2000 BIGINT,
+    year_2001 BIGINT,
+    year_2002 BIGINT,
+    year_2003 BIGINT,
+    year_2004 BIGINT,
+    year_2005 BIGINT,
+    year_2006 BIGINT,
+    year_2007 BIGINT,
+    year_2008 BIGINT,
+    year_2009 BIGINT,
+    year_2010 BIGINT,
+    year_2011 BIGINT,
+    year_2012 BIGINT,
+    year_2013 BIGINT,
+    year_2014 BIGINT,
+    year_2015 BIGINT,
+    year_2016 BIGINT,
+    year_2017 BIGINT,
+    year_2018 BIGINT,
+    year_2019 BIGINT,
+    year_2020 BIGINT,
+    year_2021 BIGINT,
+    year_2022 BIGINT,
+    year_2023 BIGINT
+);
+
+COPY population FROM 'C:/Users/itsss/Desktop/lab05/lab05/population.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+CREATE TABLE indicators (
+    country_name_wb VARCHAR(255),
+    country_code VARCHAR(3) PRIMARY KEY,
+    indicator_name VARCHAR(255),
+    indicator_code VARCHAR(50),
+    year_1960 FLOAT,
+    year_1961 FLOAT,
+    year_1962 FLOAT,
+    year_1963 FLOAT,
+    year_1964 FLOAT,
+    year_1965 FLOAT,
+    year_1966 FLOAT,
+    year_1967 FLOAT,
+    year_1968 FLOAT,
+    year_1969 FLOAT,
+    year_1970 FLOAT,
+    year_1971 FLOAT,
+    year_1972 FLOAT,
+    year_1973 FLOAT,
+    year_1974 FLOAT,
+    year_1975 FLOAT,
+    year_1976 FLOAT,
+    year_1977 FLOAT,
+    year_1978 FLOAT,
+    year_1979 FLOAT,
+    year_1980 FLOAT,
+    year_1981 FLOAT,
+    year_1982 FLOAT,
+    year_1983 FLOAT,
+    year_1984 FLOAT,
+    year_1985 FLOAT,
+    year_1986 FLOAT,
+    year_1987 FLOAT,
+    year_1988 FLOAT,
+    year_1989 FLOAT,
+    year_1990 FLOAT,
+    year_1991 FLOAT,
+    year_1992 FLOAT,
+    year_1993 FLOAT,
+    year_1994 FLOAT,
+    year_1995 FLOAT,
+    year_1996 FLOAT,
+    year_1997 FLOAT,
+    year_1998 FLOAT,
+    year_1999 FLOAT,
+    year_2000 FLOAT,
+    year_2001 FLOAT,
+    year_2002 FLOAT,
+    year_2003 FLOAT,
+    year_2004 FLOAT,
+    year_2005 FLOAT,
+    year_2006 FLOAT,
+    year_2007 FLOAT,
+    year_2008 FLOAT,
+    year_2009 FLOAT,
+    year_2010 FLOAT,
+    year_2011 FLOAT,
+    year_2012 FLOAT,
+    year_2013 FLOAT,
+    year_2014 FLOAT,
+    year_2015 FLOAT,
+    year_2016 FLOAT,
+    year_2017 FLOAT,
+    year_2018 FLOAT,
+    year_2019 FLOAT,
+    year_2020 FLOAT,
+    year_2021 FLOAT,
+    year_2022 FLOAT,
+    year_2023 FLOAT
+);
+
+-- Import the data from CSV file
+COPY indicators FROM 'C:/Users/itsss/Desktop/lab05/lab05/indicators.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',');
+```
+
+## Connections Tab Showing Tables
+
+Refer to Figure \@ref(fig:connection) and Figure \@ref(fig:spreadsheet) for details.
+
+
+```{r fig.cap='View of connection', label='fig:connection'}
+knitr::include_graphics("2302689 submission/1.png")
+```
+
+```{r fig.cap='View of spreadsheet', label='fig:spreadsheet'}
+knitr::include_graphics("2302689 submission/table.png")
+```
+
+## Removing Rows not Pertaining to Countries
+
+The World Bank CSVs include rows like “East Asia & Pacific (excluding high income)” that represent regions rather than individual countries. To focus our analysis on country-level data, we will use a `country_codes` table that includes only country codes, not regional codes. By deleting all rows in the `population` and `indicators` tables that do not match the codes in the `country_codes` table, we will ensure our analysis is restricted to individual countries.
+
+
+
+```{sql, connection=con_world_bank_db}
+-- Remove any existing country_codes table
+DROP TABLE IF EXISTS country_codes;
+
+-- Create a new country_codes table
+CREATE TABLE country_codes (
+    country_name_en VARCHAR(255),
+    country_code VARCHAR(3) PRIMARY KEY,
+    un_subregion VARCHAR(255)
+);
+
+-- Import data from the country_codes.csv file into the country_codes table
+COPY country_codes (country_name_en, country_code, un_subregion)
+FROM 'C:/Users/itsss/Desktop/lab05/lab05/data/country_codes.csv' WITH (FORMAT csv, HEADER true);
+```
+
+### Counting Rows in Population Table
+
+```{sql, connection=con_world_bank_db}
+SELECT COUNT(*) AS population_count_before FROM population;
+SELECT COUNT(*) AS indicators_count_before FROM indicators;
+
+DELETE FROM population
+WHERE country_code NOT IN (SELECT country_code FROM country_codes);
+
+DELETE FROM indicators
+WHERE country_code NOT IN (SELECT country_code FROM country_codes);
+```
+### Explanation of JOIN Operation
+
+To remove rows from the `population` and `indicators` tables that do not have corresponding entries in the `country_codes` table, an `INNER JOIN` operation should be performed. This type of join ensures that only rows with matching country codes in both tables are kept. By performing a subquery with `DELETE`, we can effectively eliminate any rows that do not have a corresponding country code in the `country_codes` table.
+
+
+### Counting Rows in Population Table After Deletion
+
+```{sql, connection=con_world_bank_db}
+SELECT COUNT(*) AS population_count_after FROM population;
+SELECT COUNT(*) AS indicators_count_after FROM indicators;
+```
+
+## Analyzing Country-Level Data
+
+For 2021 (or, if it is not included in the data, the most recent year before 2021), we will find the top ten countries based on the assigned indicator. Countries with missing indicators will be removed. In the case of ties for the tenth place, all tied countries will be included in the output. The output will include the following columns:
+
+- Country name
+- Population
+- Rank by population in descending order
+- Indicator value
+- Rank by indicator value in descending order
+
+### Top Ten Countries Based on Indicator
+
+```{sql, connection=con_world_bank_db}
+WITH CountryData AS (
+    SELECT
+        c.country_name_en AS country_name,
+        p.country_code,
+        p.year_2020 AS Population,
+        i.year_2020 AS Indicator_Value
+    FROM indicators i
+    JOIN population p ON i.country_code = p.country_code
+    JOIN country_codes c ON p.country_code = c.country_code
+    WHERE i.year_2020 IS NOT NULL AND p.year_2020 IS NOT NULL
+),
+RankedData AS (
+    SELECT
+        country_name,
+        Population,
+        Indicator_Value,
+        RANK() OVER (ORDER BY Population DESC) AS Population_Rank,
+        RANK() OVER (ORDER BY Indicator_Value DESC) AS Indicator_Rank
+    FROM CountryData
+)
+SELECT 
+    country_name,
+    Population,
+    Population_Rank,
+    Indicator_Value,
+    Indicator_Rank
+FROM RankedData
+WHERE Indicator_Rank <= 10
+ORDER BY Indicator_Rank, country_name;
+```
+
+## Conclusion
+
+The analysis identified the top ten countries based on the specified indicator for the year 2021. Interestingly, while some of the countries with the highest indicator values also had large populations, others did not. This indicates that population size alone does not determine the indicator value. The findings suggest that other factors, such as economic development, policies, or geographic attributes, may play significant roles.
+
+```{r}
+dbDisconnect(con_world_bank_db)
+```
+
+
+# R Task
+```{r}
+#| eval: true
+# Load necessary libraries
+library(tibble)
+library(ggplot2)
+
+# Define the function g()
+g <- function(x) {
+  x^2 - 4*x + 4
+}
+
+# Test the function
+test_tbl <- tibble::tibble(x = -10:10, y = g(x))
+ggplot2::ggplot(test_tbl, ggplot2::aes(x, y)) +
+  ggplot2::geom_line() +
+  ggplot2::geom_point()
+
+```

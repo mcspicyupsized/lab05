@@ -1,22 +1,3 @@
----
-title: "Lab 05"
-author: Nigel
-format:
-  html:
-    toc: true
----
-
-
-# Establishing a Productive Software Environment
-```{r}
-#| label: setup
-#| include: false
-
-library(dplyr)
-library(tidyr)
-library(readr)
-con_worldbank <- DBI::dbConnect(odbc::odbc(), dsn = "worldbank")
-```
 
 ```{r}
 # Load the CSV file
