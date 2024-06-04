@@ -7,7 +7,7 @@ format:
 ---
 
 
-# Task 1: Establishing a Productive Software Environment for the Project
+# Establishing a Productive Software Environment
 ```{r}
 #| label: setup
 #| include: false
